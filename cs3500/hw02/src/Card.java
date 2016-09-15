@@ -3,12 +3,12 @@
  */
 public class Card {
 
-  int rank; // must be in range [1,13] where 1 = ace and 11 = jack, etc.
+  int rank;
   Suit suit;
 
   enum Suit { DIAMONDS, CLUBS, HEARTS, SPADES}
 
-  Card(int rank, Suit suit) {
+  public Card(int rank, EmptyCard.Suit suit) {
     if (rank < 1 || rank > 13) {
       throw new IllegalArgumentException("Illegal card rank!");
     }
@@ -16,11 +16,16 @@ public class Card {
     this.suit = suit;
   }
 
-  int getRank() {
-    return this.rank;
+  public Card() {
+    this.rank = 0;
+    this.suit = null;
   }
 
-  Suit getSuit() {
+  public int getRank() {
+    return this.rank;
+  };
+
+  public Suit getSuit() {
     return this.suit;
   }
 
@@ -55,5 +60,17 @@ public class Card {
         break;
     }
     return result;
+  }
+
+  @Override public boolean equals(Object other) {
+    if (!(other instanceof Card)) {
+      return false;
+    }
+    Card c = (Card)other;
+    return this.suit == c.getSuit() && this.rank == c.getRank();
+  }
+
+  @Override public int hashCode() {
+    return (this.getRank() + 61) * this.suit.hashCode();
   }
 }

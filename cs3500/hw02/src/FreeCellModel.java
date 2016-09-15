@@ -2,6 +2,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Stack;
+import java.util.Arrays;
 
 /**
  * Created by Charles on 9/14/16.
@@ -10,15 +11,17 @@ public class FreeCellModel implements IFreeCellModel<Card> {
 
   List<Card> deck;
   boolean isGameOver;
-  Card[] opens;
+  ArrayList<Card> opens;
   ArrayList<Stack<Card>> foundations;
   ArrayList<Stack<Card>> cascades;
+
+  static Card mt = new EmptyCard();
 
   FreeCellModel() {
     this.deck = new ArrayList<Card>();
     initDeck();
 
-    this.opens = new Card[4];
+    this.opens = new ArrayList<>();
     this.foundations = new ArrayList<>();
     this.cascades = new ArrayList<>();
     this.isGameOver = true;
@@ -56,7 +59,11 @@ public class FreeCellModel implements IFreeCellModel<Card> {
     for (int i = numCascades; i > 0; i--) {
       this.cascades.add(new Stack<>());
     }
-    this.opens = new Card[numOpens];
+
+    this.opens = new ArrayList<>();
+    for (int i = 0; i < numOpens; i++) {
+      this.opens.add(mt);
+    }
 
 
     if (shuffle) shuffle();
@@ -76,64 +83,83 @@ public class FreeCellModel implements IFreeCellModel<Card> {
     Card c;
     switch (destinationType) {
       case OPEN:
-        if (opens[destPileNumber] == null) {
+        if (opens.get(destPileNumber) == mt) {
           switch (sourceType) {
-            case OPEN: opens[destPileNumber] = opens[sourcePileNumber];
-              opens[sourcePileNumber] = null;
+            case OPEN:
+              opens.set(destPileNumber, opens.get(sourcePileNumber));
+              opens.set(sourcePileNumber, mt);
               break;
-            case CASCADE: opens[destPileNumber] = cascades.get(sourcePileNumber).pop();
+
+            case CASCADE: opens.set(destPileNumber, cascades.get(sourcePileNumber).pop());
               break;
+
             case FOUNDATION: throw new IllegalArgumentException("don't take from foundation");
           }
         }
         else throw new IllegalArgumentException("can't stack cards in open pile");
         break;
+
       case CASCADE:
         switch (sourceType) {
           case OPEN: {
-            c = opens[sourcePileNumber];
+            c = opens.get(sourcePileNumber);
+            if (c == mt) throw new IllegalArgumentException("there's no card here!");
+
             Card top = cascades.get(destPileNumber).peek();
             if (c.getRank() == top.getRank() - 1 && !c.sameColor(top)) {
               cascades.get(destPileNumber).push(c);
-              opens[sourcePileNumber] = null;
+              opens.set(sourcePileNumber, mt);
             }
             else throw new IllegalArgumentException("can't move that there");
           }
           break;
+
           case CASCADE: {
             if (sourcePileNumber == destPileNumber)
               throw new IllegalArgumentException("same cascade pile");
-            c = cascades.get(sourcePileNumber).peek();
-            Card top = cascades.get(destPileNumber).peek();
-            if (c.getRank() == top.getRank() - 1 && !c.sameColor(top)) {
-              cascades.get(destPileNumber).push(c);
-              cascades.get(sourcePileNumber).remove(c);
-            }
-            else throw new IllegalArgumentException("can't move that there");
 
+            c = cascades.get(sourcePileNumber).peek();
+            if (c == null) throw new IllegalArgumentException("there's no card here!");
+
+            if (cascades.get(destPileNumber).size() == 0) {
+              cascades.get(destPileNumber).add(cascades.get(sourcePileNumber).pop());
+            }
+            else {
+              Card top = cascades.get(destPileNumber).peek();
+              if (c.getRank() == top.getRank() - 1 && !c.sameColor(top)) {
+                cascades.get(destPileNumber).push(cascades.get(sourcePileNumber).pop());
+              }
+              else
+                throw new IllegalArgumentException("can't move that there");
+            }
           }
           break;
+
           case FOUNDATION: throw new IllegalArgumentException("don't take from foundation");
         }
         break;
+
       case FOUNDATION:
         Stack<Card> cur;
         switch (sourceType) {
           case OPEN:
-            c = opens[sourcePileNumber];
+            c = opens.get(sourcePileNumber);
             cur = foundations.get(destPileNumber);
             if (cur.size() == 0 && c.getRank() == 1) {
               cur.push(c);
-              opens[sourcePileNumber] = null;
-            } else if (cur.size() > 0) {
+              opens.set(sourcePileNumber, mt);
+            }
+            else if (cur.size() > 0) {
               Card top = cur.peek();
               if (c.getSuit() == top.getSuit() && c.getRank() == top.getRank() + 1) {
                 cur.push(c);
-                opens[sourcePileNumber] = null;
+                opens.set(sourcePileNumber, mt);
               }
-            } else {
-              throw new IllegalArgumentException("be better at life");
             }
+            else {
+              throw new IllegalArgumentException("doesn't match foundation pile");
+            }
+
             this.isGameOver = true;
             for (Stack<Card> s: foundations) {
               if (s.size() != 13) {
@@ -141,21 +167,25 @@ public class FreeCellModel implements IFreeCellModel<Card> {
               }
             }
             break;
+
           case CASCADE:
             c = cascades.get(sourcePileNumber).peek();
             cur = foundations.get(destPileNumber);
             if (cur.size() == 0 && c.getRank() == 1) {
-              cur.push(c);
-              cascades.get(sourcePileNumber).pop();
-            } else if (cur.size() > 0) {
+              cur.push(cascades.get(sourcePileNumber).pop());
+              cascades.get(sourcePileNumber).push(mt);
+            }
+            else if (cur.size() > 0) {
               Card top = cur.peek();
               if (c.getSuit() == top.getSuit() && c.getRank() == top.getRank() + 1) {
-                cur.push(c);
-                cascades.get(sourcePileNumber).pop();
+                cur.push(cascades.get(sourcePileNumber).pop());
+                cascades.get(sourcePileNumber).push(mt);
               }
-            } else {
-              throw new IllegalArgumentException("be better at life");
             }
+            else {
+              throw new IllegalArgumentException("doesn't match foundation pile");
+            }
+
             this.isGameOver = true;
             for (Stack<Card> s: foundations) {
               if (s.size() != 13) {
@@ -163,13 +193,12 @@ public class FreeCellModel implements IFreeCellModel<Card> {
               }
             }
             break;
+
           case FOUNDATION:
             throw new IllegalArgumentException("really? really???");
-
         }
         break;
     }
-
   }
 
   @Override public String getGameState() {
@@ -181,8 +210,8 @@ public class FreeCellModel implements IFreeCellModel<Card> {
       }
       result += "\n";
     }
-    for (int i = 0; i < this.opens.length; i++) {
-      result += "O" + i + ":" + this.opens[i].toString();
+    for (int i = 0; i < this.opens.size(); i++) {
+      result += "O" + i + ":" + this.opens.get(i).toString() + "\n";
     }
     for (int i = 0; i < this.cascades.size(); i++) {
       result += "C" + i + ":";
